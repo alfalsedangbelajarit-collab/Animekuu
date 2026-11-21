@@ -30,19 +30,24 @@ export default function App(){
   const [vids,setVids]=useState<Vid[]>([])
   const [cur,setCur]=useState(-1)
   const [err,setErr]=useState('')
+  const [loading,setLoading]=useState(false)
   const [favs,setFavs]=useState<Anime[]>(ld('favs',[]))
   const [hist,setHist]=useState<Vid[]>(ld('hist',[]))
   const [sel,setSel]=useState<Anime|null>(null)
 
   const load=async(query:string)=>{
-    setErr('')
+    setErr('');setLoading(true)
     try{
       const u=query?`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(query)}&limit=20`:'https://api.jikan.moe/v4/top/anime?limit=20'
-      const r=await fetch(u);setList((await r.json()).data||[])
-    }catch{setErr('Gagal memuat data. Periksa koneksi internet.')}
+      const r=await fetch(u)
+      const j=await r.json()
+      if(!r.ok||!j.data)throw new Error(j.message||('HTTP '+r.status))
+      setList(j.data)
+    }catch(e:any){setErr('Gagal memuat: '+e.message)}
+    setLoading(false)
   }
   useEffect(()=>{load('')},[])
-  useEffect(()=>{const t=setTimeout(()=>tab==='explore'&&load(q),500);return()=>clearTimeout(t)},[q])
+  useEffect(()=>{const t=setTimeout(()=>tab==='explore'&&load(q),600);return()=>clearTimeout(t)},[q])
 
   const ytSearch=async(query:string)=>{
     setErr('')
@@ -73,11 +78,12 @@ export default function App(){
   return <div className="app">
     <h1>Animekuuuu</h1>
     {err&&<div className="msg">{err}</div>}
+    {loading&&<p>Memuat…</p>}
     {cur>=0&&<><Player id={vids[cur].id} onEnd={()=>cur<vids.length-1&&play(cur+1)}/>
       <h3>{vids[cur].title}</h3><p>{vids[cur].channel}</p>
       <button disabled={cur===0} onClick={()=>play(cur-1)}>⏮ Sebelumnya</button>
       <button disabled={cur>=vids.length-1} onClick={()=>play(cur+1)}>Berikutnya ⏭</button></>}
-    {tab==='home'&&<><h3>Trending</h3><Cards items={list}/></>}
+    {tab==='home'&&<><h3>Trending</h3><button onClick={()=>load('')}>🔄 Muat ulang</button><Cards items={list}/></>}
     {tab==='explore'&&<><input placeholder="Cari anime…" value={q} onChange={e=>setQ(e.target.value)}/><Cards items={list}/></>}
     {tab==='youtube'&&<><input placeholder="Cari video/trailer/episode resmi…" value={yq} onChange={e=>setYq(e.target.value)} onKeyDown={e=>e.key==='Enter'&&ytSearch(yq)}/>
       <div className="grid">{vids.map((v,i)=><div className="card v" key={v.id} onClick={()=>play(i)}><img src={v.thumb}/><p>{v.title}</p></div>)}</div></>}
@@ -88,4 +94,4 @@ export default function App(){
     <nav>{[['home','🏠 Home'],['explore','🔎 Explore'],['youtube','▶ YouTube'],['favs','❤️ Favorit'],['profile','👤 Profil']].map(([k,l])=>
       <button key={k} className={tab===k?'on':''} onClick={()=>setTab(k)}>{l}</button>)}</nav>
   </div>
-  }
+    }
